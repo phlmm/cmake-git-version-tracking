@@ -250,7 +250,39 @@ function(GetGitState _working_dir)
 
 endfunction()
 
+function(SaveGitStateToPy)
+    GetGitState("${GIT_WORKING_DIR}")
 
+    # Format git state to .py file
+    if("$ENV{GIT_IS_DIRTY}" STREQUAL "true")
+        set(PY_GIT_IS_DIRTY True)
+    else()
+        set(PY_GIT_IS_DIRTY False)
+    endif()
+
+    set(GIT_STATE
+        PY_GIT_HEAD_SHA = \"$ENV{GIT_HEAD_SHA1}\"\n
+        PY_GIT_IS_DIRTY = ${ES_GIT_IS_DIRTY}\n
+        PY_GIT_AUTHOR_NAME = \"$ENV{GIT_AUTHOR_NAME}\"\n
+        PY_GIT_AUTHOR_EMAIL = \"$ENV{GIT_AUTHOR_EMAIL}\"\n
+        PY_GIT_COMMIT_DATE = \"$ENV{GIT_COMMIT_DATE_ISO8601}\"\n
+        PY_GIT_COMMIT_SUBJECT = \"$ENV{GIT_COMMIT_SUBJECT}\"\n
+        PY_GIT_COMMIT_BODY = \"$ENV{GIT_COMMIT_BODY}\"\n
+        PY_GIT_DESCRIBE = \"$ENV{GIT_DESCRIBE}\"\n
+        PY_GIT_BRANCH = \"$ENV{GIT_BRANCH}\"\n)
+    string(REGEX REPLACE ";" "" GIT_STATE "${GIT_STATE}")
+
+    if(EXISTS ${GIT_STATE_PY_PATH})
+        file(READ ${GIT_STATE_PY_PATH} GIT_STATE_)
+    else()
+        set(GIT_STATE_ "")
+    endif()
+
+    if (NOT "${GIT_STATE}" STREQUAL "${GIT_STATE_}")
+        file(WRITE ${GIT_STATE_PY_PATH} "${GIT_STATE}")
+    endif()
+
+endfunction()
 
 # Function: GitStateChangedAction
 # Description: this function is executed when the state of the git
@@ -261,7 +293,6 @@ function(GitStateChangedAction)
     endforeach()
     configure_file("${PRE_CONFIGURE_FILE}" "${POST_CONFIGURE_FILE}" @ONLY)
 endfunction()
-
 
 
 # Function: HashGitState
@@ -324,7 +355,7 @@ endfunction()
 #              check the state of git before every build. If the state has
 #              changed, then a file is configured.
 function(SetupGitMonitoring)
-    add_custom_target(check_git
+    add_custom_target(${CMAKE_GIT_PROJECT_PREFIX}check_git
         ALL
         DEPENDS ${PRE_CONFIGURE_FILE}
         BYPRODUCTS
@@ -360,6 +391,10 @@ function(Main)
     else()
         # >> Executes at configure time.
         SetupGitMonitoring()
+        # Save the git state in py file
+        if(SAVE_GIT_STATE_TO_PY)
+             SaveGitStateToPy()
+        endif()
     endif()
 endfunction()
 
